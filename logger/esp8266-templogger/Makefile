@@ -10,7 +10,7 @@ build:
 	$(ARDUINO_CLI) compile --fqbn "$(FQBN)" "$(SKETCH)"
 
 installlibs:
-	$(ARDUINO_CLI) lib install GxEPD2
+	$(ARDUINO_CLI) lib install DHTNEW
 	$(ARDUINO_CLI) lib install ArduinoJson
 
 
