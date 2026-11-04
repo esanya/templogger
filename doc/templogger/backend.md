@@ -1,0 +1,1 @@
+The backend component should be able to store and display the data from multiple [[logger]]. Some simple statistic view should be possible regarding the spread (temp - dewpoint).
