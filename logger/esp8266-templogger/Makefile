@@ -17,3 +17,7 @@ installlibs:
 upload: build
 	@test -n "$(PORT)" || { echo "Set PORT to the Arduino's serial port (for example, PORT=/dev/ttyACM0)." >&2; exit 1; }
 	$(ARDUINO_CLI) upload --fqbn "$(FQBN)" --port "$(PORT)" "$(SKETCH)"
+
+
+console:
+	screen /dev/ttyUSB0 9600
