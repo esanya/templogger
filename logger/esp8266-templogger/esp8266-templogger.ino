@@ -24,18 +24,22 @@
 #define CONFIG_FILENAME "/configfile.conf"
 
 #define DHTPIN_1 5 
-#define DHTTYPE_1 DHT22 
+#define DHTTYPE_1 11
 #define Korrektur_t_1  -3 
 #define Korrektur_h_1  0  
 
-#define CTRLPIN_WIFI_AP		3
+#define CTRLPIN_WIFI_CLIENT	3
+#define CTRLPIN_WIFI_AP		4
 
 #define FLASH_MAP_SETUP_CONFIG(FLASH_MAP_MAX_FS)
 ADC_MODE(ADC_VCC)
 
 const char *ssid = STASSID;
 const char *password = STAPSK;
-uint32_t bootcount = 0; //deepsleeptime knapp unter 2hoch32, daher 22 x booten, Bootcount wird in der rtc des ESP gespeichert
+uint32_t bootcount = 0; 
+uint32_t intrcount = 0; //interrupt count
+
+//deepsleeptime knapp unter 2hoch32, daher 22 x booten, Bootcount wird in der rtc des ESP gespeichert
 uint32_t deepsleeptime = (1800*1000)*1000; 
 char buf[200]; 
 
@@ -193,6 +197,7 @@ float a, b;
 
 void take_measurement_and_store() {
   dht1.powerUp();
+  dht1.setType(DHTTYPE_1);
   delay(2000);
 
   dht1.read(); 
@@ -252,20 +257,33 @@ void handle_first_start_and_deepsleep() {
   delay(100);
 }
 
+IRAM_ATTR void blink() {
+  intrcount ++;
+//  Serial.print("Interrupt called: ");
+//  Serial.println(intrcount);
+}
+
 void setup() {
   unsigned long t=micros();
-  Serial.begin(115200);
+  Serial.begin(9600);
   Serial.print(vers);
   Serial.print("\nWaking up..., ESP.getResetReason: "); 
   Serial.println(ESP.getResetReason().c_str());
+
+
 
   if (!LittleFS.begin()) {
     Serial.println("LittleFS mount failed");
     return;
   }
 
-  pinMode(CTRLPIN_WIFI_AP, INPUT);
-  bool startWifiAp = digitalRead(CTRLPIN_WIFI_AP);
+  pinMode(CTRLPIN_WIFI_CLIENT, INPUT_PULLUP);
+  pinMode(CTRLPIN_WIFI_AP, INPUT_PULLUP);
+  int startWifiClient = digitalRead(CTRLPIN_WIFI_CLIENT);
+  int startWifiAp = digitalRead(CTRLPIN_WIFI_AP);
+
+  attachInterrupt(digitalPinToInterrupt(CTRLPIN_WIFI_CLIENT), blink, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(CTRLPIN_WIFI_AP), blink, CHANGE);
 
   // die deepsleep Zeit wird in Mikrosekunden angegeben und beträgt maximal 2hoch32, also etwas mehr als 4 Milliarden, was ca. 70 Minuten entspricht
   // Der ESP soll aber 30minuten schlafen, also sorgt der nachfolgende Algorythmus dafür das der ESP nach knapp 30 Minuten kurz aufwacht 
@@ -275,11 +293,21 @@ void setup() {
   strcpy(buf,ESP.getResetReason().c_str());
   if(buf[0]=='D') { //D steht für DeepSleeep, weitere Faelle waeren z.B. 'P'ower on oder 'S'oftware watchdog . . . 
     handle_reset_from_deepsleep();
-  } else if (startWifiAp) {
+  } else if (startWifiAp > 0) {
     wifi_server_setup();
+  } else if (startWifiClient > 0) {
+    wifi_client_setup();
   } else {
     handle_first_start_and_deepsleep();
   }
+}
+
+void wifi_client_setup(void) {
+  Serial.println("");
+
+  WiFi.printDiag(Serial);
+  WiFi.softAP(ssid, password);
+  WiFi.printDiag(Serial);
 }
 
 void wifi_server_setup(void) {
