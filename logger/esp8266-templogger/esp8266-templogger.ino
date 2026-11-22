@@ -41,7 +41,8 @@ const char *password = STAPSK;
 uint32_t bootcount = 0; 
 uint32_t intrcount = 0; //interrupt count
 
-//deepsleeptime knapp unter 2hoch32, daher 22 x booten, Bootcount wird in der rtc des ESP gespeichert
+//deepsleeptime knapp 
+//unter 2hoch32, daher 22 x booten, Bootcount wird in der rtc des ESP gespeichert
 uint32_t deepsleeptime = (1800*1000)*1000; 
 char buf[200]; 
 
@@ -273,7 +274,9 @@ void setup() {
   Serial.begin(9600);
   Serial.print(vers);
   Serial.print("\nWaking up..., ESP.getResetReason: "); 
-  Serial.println(ESP.getResetReason().c_str());
+
+  strcpy(buf,ESP.getResetReason().c_str());
+  Serial.println(buf);
 
 
 
@@ -299,9 +302,9 @@ void setup() {
 
   if(buf[0]=='D') { //D steht für DeepSleeep, weitere Faelle waeren z.B. 'P'ower on oder 'S'oftware watchdog . . . 
     handle_reset_from_deepsleep();
-  } else if (startWifiAp > 0) {
+  } else if (startWifiAp == 0) {
     wifi_server_setup();
-  } else if (startWifiClient > 0) {
+  } else if (startWifiClient == 0) {
     wifi_client_setup();
   } else {
     handle_first_start_and_deepsleep();
