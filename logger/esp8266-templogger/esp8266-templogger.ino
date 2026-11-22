@@ -23,13 +23,15 @@
 #define RTCMEMORYSTART 65 
 #define CONFIG_FILENAME "/configfile.conf"
 
-#define DHTPIN_1 5 
-#define DHTTYPE_1 11
+#define DHTPOWERPIN_1	0
+#define DHTPIN_1	5 
+#define CTRLPIN_WIFI_CLIENT	3
+#define CTRLPIN_WIFI_AP		4
+
+#define DHTTYPE_1	11
 #define Korrektur_t_1  -3 
 #define Korrektur_h_1  0  
 
-#define CTRLPIN_WIFI_CLIENT	3
-#define CTRLPIN_WIFI_AP		4
 
 #define FLASH_MAP_SETUP_CONFIG(FLASH_MAP_MAX_FS)
 ADC_MODE(ADC_VCC)
@@ -196,6 +198,7 @@ float a, b;
 }
 
 void take_measurement_and_store() {
+  digitalWrite(DHTPOWERPIN_1, 1);
   dht1.powerUp();
   dht1.setType(DHTTYPE_1);
   delay(2000);
@@ -221,6 +224,8 @@ void take_measurement_and_store() {
 #else
   appendMeasurement((unsigned long)bootcount, t1, h1, dewPoint, fehler);
 #endif
+  dht1.powerDown();
+  digitalWrite(DHTPOWERPIN_1, 0);
 }
 
 void handle_reset_from_deepsleep() {
@@ -276,21 +281,22 @@ void setup() {
     Serial.println("LittleFS mount failed");
     return;
   }
-
+//
   pinMode(CTRLPIN_WIFI_CLIENT, INPUT_PULLUP);
   pinMode(CTRLPIN_WIFI_AP, INPUT_PULLUP);
+  pinMode(DHTPOWERPIN_1, OUTPUT);
+  digitalWrite(DHTPOWERPIN_1, 1);
   int startWifiClient = digitalRead(CTRLPIN_WIFI_CLIENT);
   int startWifiAp = digitalRead(CTRLPIN_WIFI_AP);
-
-  attachInterrupt(digitalPinToInterrupt(CTRLPIN_WIFI_CLIENT), blink, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(CTRLPIN_WIFI_AP), blink, CHANGE);
+//
+//  attachInterrupt(digitalPinToInterrupt(CTRLPIN_WIFI_CLIENT), blink, CHANGE);
+//  attachInterrupt(digitalPinToInterrupt(CTRLPIN_WIFI_AP), blink, CHANGE);
 
   // die deepsleep Zeit wird in Mikrosekunden angegeben und beträgt maximal 2hoch32, also etwas mehr als 4 Milliarden, was ca. 70 Minuten entspricht
   // Der ESP soll aber 30minuten schlafen, also sorgt der nachfolgende Algorythmus dafür das der ESP nach knapp 30 Minuten kurz aufwacht 
   // (dauert ca 1,5 millisek.), den bootcounter erhöht und im nichtfluechtigem rtc Speicher ablegt und wieder schlafen geht. 
   // Ob das System aus dem deepsleep kommt oderneu eingeschaltet wurde, wird über ESP.getReason ermittelt.
 
-  strcpy(buf,ESP.getResetReason().c_str());
   if(buf[0]=='D') { //D steht für DeepSleeep, weitere Faelle waeren z.B. 'P'ower on oder 'S'oftware watchdog . . . 
     handle_reset_from_deepsleep();
   } else if (startWifiAp > 0) {
