@@ -100,8 +100,8 @@ uint16_t floatToFloat16(float value) {
 }
 
 void appendMeasurement(unsigned long count, float t1, float h1, float dewPoint, bool sensorError) {
-  // Little-endian record: uint32 bootcount, float16 t1/h1/dewPoint, uint8 error flag.
-  uint8_t record[11];
+  // Little-endian record: uint32 bootcount, float16 t1/h1/dewPoint, uint8 error flag, uint16 CRC.
+  uint8_t record[13];
   uint16_t t1Half = floatToFloat16(t1);
   uint16_t h1Half = floatToFloat16(h1);
   uint16_t dewPointHalf = floatToFloat16(dewPoint);
@@ -117,6 +117,16 @@ void appendMeasurement(unsigned long count, float t1, float h1, float dewPoint, 
   record[8] = dewPointHalf & 0xff;
   record[9] = dewPointHalf >> 8;
   record[10] = sensorError ? 1 : 0;
+
+  uint16_t crc = 0xffff;
+  for (size_t i = 0; i < 11; i++) {
+    crc ^= static_cast<uint16_t>(record[i]) << 8;
+    for (uint8_t bit = 0; bit < 8; bit++) {
+      crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : crc << 1;
+    }
+  }
+  record[11] = crc & 0xff;
+  record[12] = crc >> 8;
 
   const char *path = "/measurement.bin";
   Serial.printf("Appending binary measurement to: %s\n", path);
