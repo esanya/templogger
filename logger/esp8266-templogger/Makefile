@@ -21,3 +21,7 @@ upload: build
 
 console:
 	screen /dev/ttyUSB0 9600
+
+
+testpythondecoder:
+	python3 -m unittest test_decode_measurements.py
