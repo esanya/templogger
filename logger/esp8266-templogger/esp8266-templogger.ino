@@ -478,6 +478,68 @@ void wifi_server_setup(void) {
     } 
   });
 
+  server.on(UriBraces("/base64get/{}"), []() {
+    Serial.println(F(""));
+    String filename = server.pathArg(0);
+    File file = LittleFS.open(filename, "r");
+
+    if (!file) {
+      Serial.println("file open failed");
+      server.send(404, F("text/plain"), F("does not exists"));
+      return;
+    }
+
+    const char base64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    char encoded[268];
+    size_t carryCount = 0;
+    server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    server.send(200, F("text/plain"), "");
+
+    while (file.available()) {
+      int bytesRead = file.read(
+          reinterpret_cast<uint8_t *>(buf + carryCount), sizeof(buf) - carryCount);
+      if (bytesRead <= 0) {
+        break;
+      }
+
+      size_t byteCount = carryCount + static_cast<size_t>(bytesRead);
+      size_t completeBytes = byteCount - byteCount % 3;
+      size_t encodedLength = 0;
+      for (size_t i = 0; i < completeBytes; i += 3) {
+        uint32_t value = (static_cast<uint8_t>(buf[i]) << 16) |
+                         (static_cast<uint8_t>(buf[i + 1]) << 8) |
+                         static_cast<uint8_t>(buf[i + 2]);
+        encoded[encodedLength++] = base64[(value >> 18) & 0x3f];
+        encoded[encodedLength++] = base64[(value >> 12) & 0x3f];
+        encoded[encodedLength++] = base64[(value >> 6) & 0x3f];
+        encoded[encodedLength++] = base64[value & 0x3f];
+      }
+
+      if (encodedLength > 0) {
+        server.sendContent(encoded, encodedLength);
+      }
+      carryCount = byteCount - completeBytes;
+      if (carryCount > 0) {
+        memmove(buf, buf + completeBytes, carryCount);
+      }
+    }
+
+    if (carryCount > 0) {
+      uint32_t value = static_cast<uint8_t>(buf[0]) << 16;
+      if (carryCount == 2) {
+        value |= static_cast<uint8_t>(buf[1]) << 8;
+      }
+      encoded[0] = base64[(value >> 18) & 0x3f];
+      encoded[1] = base64[(value >> 12) & 0x3f];
+      encoded[2] = carryCount == 2 ? base64[(value >> 6) & 0x3f] : '=';
+      encoded[3] = '=';
+      server.sendContent(encoded, 4);
+    }
+
+    file.close();
+    server.sendContent("");
+  });
+
   server.on(UriBraces("/setcurrenttime/{}"), []() {
     Serial.println(F(""));
     String time = server.pathArg(0);
