@@ -22,6 +22,25 @@ upload: build
 console:
 	screen /dev/ttyUSB0 9600
 
+provision:
+ifdef LOGGER_DEVIVE_NAME
+	echo LOGGER_DEVIVE_NAME is $(LOGGER_DEVIVE_NAME)
+	curl http://192.168.4.1/config/devicename/$(LOGGER_DEVIVE_NAME)
+	curl http://192.168.4.1/config/provtime/`date`
+else
+	echo LOGGER_DEVIVE_NAME is not defined
+endif
+
 
 testpythondecoder:
 	python3 -m unittest test_decode_measurements.py
+
+downloadbin:
+	curl http://192.168.4.1/base64get/measurement.bin > /tmp/measurement.binb64
+
+decodebase64:
+	base64 -d /tmp/measurement.binb64 > /tmp/measurement.bin
+
+decodebintocsv:
+	python3 decode_measurements.py /tmp/measurement.bin > /tmp/measurement.csv
+	date >> /tmp/measurement.csv 
