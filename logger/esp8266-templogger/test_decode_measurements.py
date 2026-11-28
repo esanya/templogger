@@ -20,12 +20,20 @@ def make_record(count, t1, humidity, dew_point, sensor_error):
 
 
 class DecodeMeasurementsTests(unittest.TestCase):
-    def run_decoder(self, contents):
+    def run_decoder(self, contents, startdatetime="2024-01-02T03:04:00", deltaTime=5):
         with tempfile.TemporaryDirectory() as directory:
             binary_file = pathlib.Path(directory) / "measurement.bin"
             binary_file.write_bytes(contents)
             return subprocess.run(
-                [sys.executable, str(SCRIPT), str(binary_file)],
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    str(binary_file),
+                    "--startdatetime",
+                    startdatetime,
+                    "--deltaTime",
+                    str(deltaTime),
+                ],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -35,16 +43,18 @@ class DecodeMeasurementsTests(unittest.TestCase):
         valid_record = make_record(42, 21.5, 58.25, 12.75, 0)
         invalid_record = bytearray(make_record(43, 22.0, 60.0, 13.0, 1))
         invalid_record[0] ^= 0x01
+        next_valid_record = make_record(44, 22.5, 61.0, 13.5, 0)
 
-        result = self.run_decoder(valid_record + invalid_record)
+        result = self.run_decoder(valid_record + invalid_record + next_valid_record)
 
         self.assertEqual(result.returncode, 1)
         rows = list(csv.reader(io.StringIO(result.stdout)))
         self.assertEqual(
             rows,
             [
-                ["count", "t1", "h1", "dewPoint", "sensorError"],
-                ["42", "21.5", "58.25", "12.75", "0"],
+                ["count", "t1", "h1", "dewPoint", "sensorError", "Spread", "timestamp"],
+                ["42", "21.5", "58.25", "12.75", "0", "8.75", "2024-01-02 03:04:00"],
+                ["44", "22.5", "61.0", "13.5", "0", "9.0", "2024-01-02 03:09:00"],
             ],
         )
         self.assertIn("record 2: CRC mismatch", result.stderr)

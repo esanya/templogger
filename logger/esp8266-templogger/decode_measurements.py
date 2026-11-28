@@ -5,6 +5,7 @@ import argparse
 import csv
 import struct
 import sys
+from datetime import datetime, timedelta
 
 
 RECORD_SIZE = 13
@@ -23,11 +24,12 @@ def crc16_ccitt(data):
     return crc
 
 
-def decode_file(source):
+def decode_file(source, startdatetime: datetime, deltaTime: int):
     writer = csv.writer(sys.stdout, lineterminator="\n")
-    writer.writerow(("count", "t1", "h1", "dewPoint", "sensorError"))
+    writer.writerow(("count", "t1", "h1", "dewPoint", "sensorError", "Spread", "timestamp"))
     has_errors = False
     record_number = 0
+    timestamp = startdatetime
 
     while True:
         record = source.read(RECORD_SIZE)
@@ -57,7 +59,8 @@ def decode_file(source):
         count, t1, humidity, dew_point, sensor_error = DATA_FORMAT.unpack(
             record[:11]
         )
-        writer.writerow((count, t1, humidity, dew_point, sensor_error))
+        writer.writerow((count, t1, humidity, dew_point, sensor_error, t1-dew_point, timestamp))
+        timestamp += timedelta(minutes=deltaTime)
 
     return 1 if has_errors else 0
 
@@ -67,11 +70,23 @@ def main():
         description="Decode ESP8266 templogger measurement records as CSV."
     )
     parser.add_argument("binary_file", help="path to the measurement binary file")
+    parser.add_argument(
+        "--startdatetime",
+        type=datetime.fromisoformat,
+        required=True,
+        help="timestamp for the first decoded record (ISO 8601)",
+    )
+    parser.add_argument(
+        "--deltaTime",
+        type=int,
+        required=True,
+        help="minutes between decoded records",
+    )
     args = parser.parse_args()
 
     try:
         with open(args.binary_file, "rb") as source:
-            return decode_file(source)
+            return decode_file(source, args.startdatetime, args.deltaTime)
     except OSError as error:
         print(f"{args.binary_file}: {error}", file=sys.stderr)
         return 2
